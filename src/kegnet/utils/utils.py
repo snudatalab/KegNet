@@ -31,7 +31,6 @@ def prepare_fake_data(teacher: nn.Module, **kwargs) -> DataLoader:
     dataset = kwargs['dataset']
     batch_size = kwargs['batch_size']
     num_batches = kwargs['num_batches']
-    label_dist = kwargs['label_dist']
     adjust = kwargs['adjust']
     temperature = kwargs['temperature']
 
@@ -48,8 +47,8 @@ def prepare_fake_data(teacher: nn.Module, **kwargs) -> DataLoader:
     num_classes = generators[0].num_classes
     num_noises = generators[0].num_noises
 
-    noises = gen_utils.generate_noises(size=(num_data, num_noises), dist='normal')
-    labels_in = gen_utils.generate_labels(num_data, num_classes, label_dist)
+    noises = gen_utils.sample_noises(size=(num_data, num_noises))
+    labels_in = gen_utils.sample_labels(num_data, num_classes, dist='onehot')
     loader = DataLoader(TensorDataset(noises, labels_in), batch_size=256)
 
     softmax = nn.Softmax(dim=1)

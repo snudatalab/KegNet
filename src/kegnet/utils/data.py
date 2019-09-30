@@ -10,7 +10,6 @@ from numpy import ndarray
 from torch.utils.data import DataLoader, SubsetRandomSampler, TensorDataset
 
 ROOT_PATH = '../data'
-DATASETS = ('mnist', 'fashion', 'svhn', 'cifar10', 'uci')
 
 
 def _normalize(arr: ndarray) -> ndarray:
@@ -145,34 +144,6 @@ class SVHN(Data):
         return _to_image_loaders(trn_data, trn_data, test_data, batch_size)
 
 
-class CIFAR10(Data):
-    def __init__(self):
-        super().__init__()
-        self.nx = 1024 * 3
-        self.ny = 10
-        self.nc = 3
-        self.size = 3, 32, 32
-
-    def to_loaders(self, batch_size: int):
-        path = '{}/mnist'.format(ROOT_PATH)
-        stat = ((0.4912, 0.4821, 0.4467), (0.2472, 0.2436, 0.2617))
-
-        train_trans = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(32, 4),
-            transforms.ToTensor(),
-            transforms.Normalize(*stat)])
-        test_trans = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(*stat)])
-
-        trn_data = torch_datasets.CIFAR10(
-            path, train=True, transform=train_trans, download=True)
-        val_data = torch_datasets.CIFAR10(path, train=True, transform=test_trans)
-        test_data = torch_datasets.CIFAR10(path, train=False, transform=test_trans)
-        return _to_image_loaders(trn_data, val_data, test_data, batch_size)
-
-
 class UCI(Data):
     @staticmethod
     def _read_dfs(dataset: str, path: str):
@@ -256,15 +227,16 @@ class UCI(Data):
         return trn_l, val_l, test_l
 
 
-def to_dataset(dataset: str) -> Data:
+def to_dataset(dataset):
+    """
+    Return a dataset class given its name.
+    """
     if dataset == 'mnist':
         return MNIST()
     elif dataset == 'fashion':
         return Fashion()
     elif dataset == 'svhn':
         return SVHN()
-    elif dataset == 'cifar10':
-        return CIFAR10()
     else:
         return UCI(dataset)
 

@@ -1,10 +1,10 @@
 import torch
 from torch import nn
 
-from kegnet.utils.tucker import DecomposedLinear
+from kegnet.utils import tucker
 
 
-class FNN(nn.Module):
+class MLP(nn.Module):
     def _to_layers(self, units: int):
         in_features = self.in_features
         drop_probability = self.drop_prob
@@ -45,7 +45,7 @@ class FNN(nn.Module):
                         new_ranks.append(int(units))
                     else:
                         new_ranks.append(rank)
-                layer = DecomposedLinear(layer, tuple(new_ranks), hooi=hooi)
+                layer = tucker.DecomposedLinear(layer, tuple(new_ranks), hooi=hooi)
             layers.append(layer)
 
         self.layers = nn.Sequential(*layers)

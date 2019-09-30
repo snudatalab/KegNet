@@ -1,58 +1,78 @@
 import torch
-from torch import nn, Tensor
-from torch.nn import Module
+from torch import nn
 
 
-class ReconstructionLoss(Module):
-    def __init__(self, how: str = 'kld'):
+class ReconstructionLoss(nn.Module):
+    """
+    Reconstruction loss for labels and noises.
+    """
+
+    def __init__(self, method):
+        """
+        Class initializer.
+        """
         super().__init__()
-        self.how = how
-        self.loss = self._to_loss(how)
-        if how == 'kld':
+        self.how = method
+        if method == 'kld':
+            self.loss = nn.KLDivLoss(reduction='batchmean')
             self.log_softmax = nn.LogSoftmax(dim=1)
-
-    @staticmethod
-    def _to_loss(how: str) -> Module:
-        if how == 'kld':
-            return nn.KLDivLoss(reduction='batchmean')
-        elif how == 'l1':
-            return nn.L1Loss()
-        elif how == 'l2':
-            return nn.MSELoss()
+        elif method == 'l1':
+            self.loss = nn.L1Loss()
+        elif method == 'l2':
+            self.loss = nn.MSELoss()
         else:
-            raise ValueError(how)
+            raise ValueError(method)
 
-    def forward(self, output: Tensor, target: Tensor) -> Tensor:
+    def forward(self, output, target):
+        """
+        Forward propagation.
+        """
         if self.how == 'kld':
             output = self.log_softmax(output)
         return self.loss(output, target)
 
 
 class DiversityLoss(nn.Module):
-    def __init__(self, metric: str = 'l1'):
+    """
+    Diversity loss for improving the performance.
+    """
+
+    def __init__(self, metric):
+        """
+        Class initializer.
+        """
         super().__init__()
         self.metric = metric
         self.cosine = nn.CosineSimilarity(dim=2)
 
-    def _compute_distance(self, t1: Tensor, t2: Tensor, how: str):
-        if how == 'l1':
-            return torch.abs(t1 - t2).mean(dim=(2,))
-        elif how == 'l2':
-            return torch.pow(t1 - t2, 2).mean(dim=(2,))
-        elif how == 'cosine':
-            return 1 - self.cosine(t1, t2)
+    def compute_distance(self, tensor1, tensor2, metric):
+        """
+        Compute the distance between two tensors.
+        """
+        if metric == 'l1':
+            return torch.abs(tensor1 - tensor2).mean(dim=(2,))
+        elif metric == 'l2':
+            return torch.pow(tensor1 - tensor2, 2).mean(dim=(2,))
+        elif metric == 'cosine':
+            return 1 - self.cosine(tensor1, tensor2)
         else:
-            raise ValueError(how)
+            raise ValueError(metric)
 
-    def _pairwise_distance(self, tensor: Tensor, how: str) -> Tensor:
+    def pairwise_distance(self, tensor, how):
+        """
+        Compute the pairwise distances between a Tensor's rows.
+        """
         n_data = tensor.size(0)
         tensor1 = tensor.expand((n_data, n_data, tensor.size(1)))
         tensor2 = tensor.unsqueeze(dim=1)
-        return self._compute_distance(tensor1, tensor2, how)
+        return self.compute_distance(tensor1, tensor2, how)
 
-    def forward(self, noises: Tensor, layer: Tensor) -> Tensor:
+    def forward(self, noises, layer):
+        """
+        Forward propagation.
+        """
         if len(layer.shape) > 2:
             layer = layer.view((layer.size(0), -1))
-        layer_dist = self._pairwise_distance(layer, how=self.metric)
-        noise_dist = self._pairwise_distance(noises, how='l2')
+        layer_dist = self.pairwise_distance(layer, how=self.metric)
+        noise_dist = self.pairwise_distance(noises, how='l2')
         return torch.exp(torch.mean(-noise_dist * layer_dist))

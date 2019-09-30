@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as func
 from torch import Tensor
 
-from kegnet.utils.tucker import DecomposedConv2d
+from kegnet.utils import tucker
 
 
 class IdentityMapping(nn.Module):
@@ -91,9 +91,9 @@ class ResNet(nn.Module):
     def compress(self, target: tuple, rank: object, hooi: bool):
         for layer in self.layers3:
             if 1 in target:
-                layer.conv1 = DecomposedConv2d(layer.conv1, rank, hooi)
+                layer.conv1 = tucker.DecomposedConv2d(layer.conv1, rank, hooi)
             if 2 in target:
-                layer.conv2 = DecomposedConv2d(layer.conv2, rank, hooi)
+                layer.conv2 = tucker.DecomposedConv2d(layer.conv2, rank, hooi)
 
 
 def resnet14(**kwargs) -> ResNet:

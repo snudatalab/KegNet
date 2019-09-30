@@ -3,8 +3,7 @@ import shutil
 
 import numpy as np
 import torch
-import torch.optim as optim
-from torch import optim as op
+from torch import optim
 from torchvision.utils import save_image
 
 from kegnet.classifier import utils as cls_utils
@@ -16,15 +15,13 @@ from kegnet.utils import utils, data
 DEVICE = None
 
 
-def update(networks: tuple, losses: tuple, optimizer: optim.Adam, **kwargs) -> tuple:
+def update(networks, losses, optimizer, **kwargs):
     generator, classifier, decoder = networks
     cls_loss, dec_loss, div_loss = losses
     list_bs, list_loss, list_corr = [], [], []
 
     batch_size = kwargs['batch_size']
     num_batches = kwargs['num_batches']
-    label_dist = kwargs['label_dist']
-    noise_dist = kwargs['noise_dist']
     alpha = kwargs['alpha']
     beta = kwargs['beta']
 
@@ -35,8 +32,8 @@ def update(networks: tuple, losses: tuple, optimizer: optim.Adam, **kwargs) -> t
 
     for _ in range(num_batches):
         noise_size = batch_size, n_noises
-        noises = gen_utils.generate_noises(noise_size, noise_dist).to(DEVICE)
-        labels = gen_utils.generate_labels(batch_size, n_classes, label_dist).to(DEVICE)
+        noises = gen_utils.sample_noises(noise_size).to(DEVICE)
+        labels = gen_utils.sample_labels(batch_size, n_classes, dist='onehot').to(DEVICE)
 
         optimizer.zero_grad()
 
@@ -61,7 +58,7 @@ def update(networks: tuple, losses: tuple, optimizer: optim.Adam, **kwargs) -> t
     return accuracy, loss
 
 
-def visualize_images(generator: models.Generator, epoch: int, path: str):
+def visualize_images(generator, epoch, path):
     os.makedirs(os.path.join(path, 'images'), exist_ok=True)
     path_ = os.path.join(path, 'images/images-{:03d}.png'.format(epoch))
     images = gen_utils.generate_data(generator, repeats=10, device=DEVICE)
@@ -73,7 +70,7 @@ def set_if_none(variable, value):
     return value if variable is None else variable
 
 
-def main(dataset: str, classifier: str, index: int, path_out: str,
+def main(dataset, classifier: str, index: int, path_out: str,
          model: str = None, alpha: float = None, beta: float = None) -> str:
     global DEVICE
     DEVICE = utils.set_device(gpu=index)
@@ -84,8 +81,6 @@ def main(dataset: str, classifier: str, index: int, path_out: str,
     num_batches = 100
     save_every = 100
     viz_every = 10
-    label_dist = 'onehot'
-    noise_dist = 'normal'
 
     if dataset == 'mnist':
         dec_layers = 1
@@ -105,14 +100,12 @@ def main(dataset: str, classifier: str, index: int, path_out: str,
         model = set_if_none(model, 'resnet14')
         alpha = set_if_none(alpha, 1)
         beta = set_if_none(beta, 1)
-    elif data.is_uci(dataset):
+    else:
         dec_layers = 2
         lrn_rate = 1e-4
         model = set_if_none(model, 'linear')
         alpha = set_if_none(alpha, 1)
         beta = set_if_none(beta, 0)
-    else:
-        raise ValueError()
 
     cls_network = cls_utils.init_classifier(dataset, model).to(DEVICE)
     gen_network = gen_utils.init_generator(dataset).to(DEVICE)
@@ -134,21 +127,19 @@ def main(dataset: str, classifier: str, index: int, path_out: str,
     with open(path_loss, 'w') as f:
         f.write('Epoch\tClsLoss\tDecLoss\tDivLoss\tLossSum\tAccr\n')
 
-    loss1 = gen_loss.ReconstructionLoss(how='kld').to(DEVICE)
-    loss2 = gen_loss.ReconstructionLoss(how='l2').to(DEVICE)
+    loss1 = gen_loss.ReconstructionLoss(method='kld').to(DEVICE)
+    loss2 = gen_loss.ReconstructionLoss(method='l2').to(DEVICE)
     loss3 = gen_loss.DiversityLoss(metric='l1').to(DEVICE)
     losses = loss1, loss2, loss3
 
     params = list(gen_network.parameters()) + list(dec_network.parameters())
-    optimizer = op.Adam(params, lrn_rate)
+    optimizer = optim.Adam(params, lrn_rate)
 
     for epoch in range(1, num_epochs + 1):
         trn_acc, trn_losses = update(
             networks, losses, optimizer,
             batch_size=batch_size,
             num_batches=num_batches,
-            label_dist=label_dist,
-            noise_dist=noise_dist,
             alpha=alpha,
             beta=beta)
 

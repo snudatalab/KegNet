@@ -1,28 +1,21 @@
 import numpy as np
 import torch
-from torch import Tensor
 
 from kegnet.generator import models
 from kegnet.utils import data
 
 
-def generate_noises(size: tuple, dist: str):
-    if dist == 'normal':
-        return torch.randn(size)
-    elif dist == 'binary':
-        return torch.randint(0, 2, size, dtype=torch.float)
-    elif dist == 'ternary':
-        return torch.randint(-1, 2, size, dtype=torch.float)
-    elif dist == 'onehot':
-        values = np.random.randint(0, size[1], size[0])
-        noises = torch.zeros(size)
-        noises[torch.arange(size[0]), values] = 1
-        return noises
-    else:
-        raise ValueError(dist)
+def sample_noises(size):
+    """
+    Sample noise vectors (z).
+    """
+    return torch.randn(size)
 
 
-def generate_labels(num_data: int, num_classes: int, dist: str) -> Tensor:
+def sample_labels(num_data, num_classes, dist):
+    """
+    Sample label vectors (y).
+    """
     if dist == 'onehot':
         init_labels = np.random.randint(0, num_classes, num_data)
         labels = np.zeros((num_data, num_classes), dtype=int)
@@ -35,21 +28,20 @@ def generate_labels(num_data: int, num_classes: int, dist: str) -> Tensor:
         raise ValueError(dist)
 
 
-def init_generator(dataset: str) -> models.Generator:
+def init_generator(dataset):
     ny = data.to_dataset(dataset).ny
     nx = data.to_dataset(dataset).nx
     nc = data.to_dataset(dataset).nc
-    nz = 10
 
-    if dataset in ('mnist', 'fashion', 'svhn', 'cifar10'):
-        return models.ImageGenerator(nz, ny, nc)
+    if dataset in ('mnist', 'fashion', 'svhn'):
+        return models.ImageGenerator(ny, nc)
     elif data.is_uci(dataset):
-        return models.DenseGenerator(nz, ny, nx, n_layers=2)
+        return models.DenseGenerator(ny, nx, n_layers=2)
     else:
         raise ValueError(dataset)
 
 
-def generate_data(generator: models.Generator,
+def generate_data(generator,
                   repeats: int,
                   adjust: bool = True,
                   device: torch.device = None):
@@ -58,7 +50,7 @@ def generate_data(generator: models.Generator,
     num_noises = generator.num_noises
     num_classes = generator.num_classes
 
-    noises = generate_noises((repeats, num_noises), dist='normal')
+    noises = sample_noises(size=(repeats, num_noises))
     noises[0, :] = 0
     noises = np.repeat(noises.detach().numpy(), repeats=num_classes, axis=0)
     noises = torch.tensor(noises, dtype=torch.float32, device=device)

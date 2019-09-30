@@ -2,10 +2,9 @@
 https://github.com/activatedgeek/LeNet-5/blob/master/lenet.py
 """
 import torch
-from torch import Tensor
 from torch import nn
 
-from kegnet.utils.tucker import DecomposedConv2d
+from kegnet.utils import tucker
 
 
 class LeNet5(nn.Module):
@@ -19,7 +18,7 @@ class LeNet5(nn.Module):
         self.fc1 = nn.Linear(120, 84)
         self.fc2 = nn.Linear(84, 10)
 
-    def forward(self, x: Tensor):
+    def forward(self, x):
         out = self.conv1(x)
         out = torch.relu(out)
         out = self.max_pool1(out)
@@ -34,10 +33,24 @@ class LeNet5(nn.Module):
         out = self.fc2(out)
         return out
 
-    def compress(self, target: tuple, rank: tuple = None, hooi: bool = False):
-        if 1 in target:
-            self.conv1 = DecomposedConv2d(self.conv1, rank, hooi)
-        if 2 in target:
-            self.conv2 = DecomposedConv2d(self.conv2, rank, hooi)
-        if 3 in target:
-            self.conv3 = DecomposedConv2d(self.conv3, rank, hooi)
+    def compress_layer(self, layer, ranks='evbmf', hooi=True):
+        if layer == 1:
+            self.conv1 = tucker.DecomposedConv2d(self.conv1, ranks, hooi)
+        elif layer == 2:
+            self.conv2 = tucker.DecomposedConv2d(self.conv2, ranks, hooi)
+        elif layer == 3:
+            self.conv3 = tucker.DecomposedConv2d(self.conv3, ranks, hooi)
+        else:
+            raise ValueError(layer)
+
+    def compress(self, option):
+        if option == 1:
+            self.compress_layer(layer=3)
+        elif option == 2:
+            self.compress_layer(layer=2)
+            self.compress_layer(layer=3)
+        elif option == 3:
+            self.compress_layer(layer=2)
+            self.compress_layer(layer=3, ranks=(5, 8))
+        else:
+            raise ValueError()

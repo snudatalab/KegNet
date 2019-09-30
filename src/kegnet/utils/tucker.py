@@ -1,82 +1,68 @@
 import tensorly as tl
-import tensorly.decomposition as decomp
+from tensorly import decomposition as decomp
+from tensorly import tucker_tensor as tucker
 import torch
-import torch.nn as nn
-from tensorly.tucker_tensor import tucker_to_tensor
-from torch.nn import Module
+from torch import nn
 
-from kegnet.utils.vbmf import EVBMF
+from kegnet.utils import vbmf
 
 tl.set_backend('pytorch')
 
 
-class DecomposedConv2d(Module):
+class DecomposedConv2d(nn.Module):
     """
-    The most basic convolutional module with tucker-2 decomposition
-
-    Reference
-        - Compression of Deep Convolutional Neural Networks
-          for Fast and Low Power Mobile Applications
+    Decomposed (or compressed) convolutional layer.
     """
 
-    def __init__(self, conv_layer: Module,
-                 rank: tuple or str = 'evbmf',
-                 hooi: bool = False):
+    @staticmethod
+    def choose_ranks(weight, ranks):
         """
-        Constructor for Tucker2DecomposedConv Layer
-
-        @param conv_layer: Original layer to decompose
-        @param rank: Projection rank (default None)
-            If None, run EVBMF to calculate rank
-        @param hooi: whether using HOOI to initialize layer weight (default F)
-            If true, it is same as tucker decomposition
-            Else, it initializes randomly
+        Choose the target ranks.
         """
-
-        super(DecomposedConv2d, self).__init__()
-
-        # get device
-        device = conv_layer.weight.device
-
-        # get weight and bias
-        weight = conv_layer.weight.data
-
         out_channels, in_channels, _, _ = weight.shape
-
-        if rank == 'evbmf':
-            # run EVBMF and get estimated ranks
+        if ranks == 'evbmf':
             unfold_0 = tl.base.unfold(weight, 0)
             unfold_1 = tl.base.unfold(weight, 1)
-            _, diag_0, _, _ = EVBMF(unfold_0)
-            _, diag_1, _, _ = EVBMF(unfold_1)
+            _, diag_0, _, _ = vbmf.EVBMF(unfold_0)
+            _, diag_1, _, _ = vbmf.EVBMF(unfold_1)
             out_rank = diag_0.shape[0]
             in_rank = diag_1.shape[1]
-        elif isinstance(rank, float):
-            out_rank = int(out_channels * rank)
-            in_rank = int(in_channels * rank)
-        elif isinstance(rank, tuple):
-            in_rank, out_rank = rank
+        elif isinstance(ranks, float):
+            out_rank = int(out_channels * ranks)
+            in_rank = int(in_channels * ranks)
+        elif isinstance(ranks, tuple):
+            in_rank, out_rank = ranks
         else:
-            raise ValueError(rank)
-        # print('Projection Ranks: [{}, {}]'.format(in_rank, out_rank))
+            raise ValueError(ranks)
+        return out_rank, in_rank
 
-        # initialize layers
+    def __init__(self, layer, ranks='evbmf', initialize=True):
+        """
+        Class initializer.
+        """
+        super(DecomposedConv2d, self).__init__()
+
+        device = layer.weight.device
+        weight = layer.weight.data
+        out_channels, in_channels, _, _ = weight.shape
+        out_rank, in_rank = self.choose_ranks(weight, ranks)
+
         self.in_channel_layer = nn.Conv2d(
             in_channels=in_channels,
             out_channels=in_rank,
             kernel_size=1,
             stride=1,
             padding=0,
-            dilation=conv_layer.dilation,
+            dilation=layer.dilation,
             bias=False).to(device)
 
         self.core_layer = nn.Conv2d(
             in_channels=in_rank,
             out_channels=out_rank,
-            kernel_size=conv_layer.kernel_size,
-            stride=conv_layer.stride,
-            padding=conv_layer.padding,
-            dilation=conv_layer.dilation,
+            kernel_size=layer.kernel_size,
+            stride=layer.stride,
+            padding=layer.padding,
+            dilation=layer.dilation,
             bias=False).to(device)
 
         self.out_channel_layer = nn.Conv2d(
@@ -85,21 +71,17 @@ class DecomposedConv2d(Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            dilation=conv_layer.dilation,
-            bias=conv_layer.bias is not None).to(device)
+            dilation=layer.dilation,
+            bias=layer.bias is not None).to(device)
 
-        if hooi:
-            # use traditional tucker2 decomposition
-
+        if initialize:
             core, factors = decomp.partial_tucker(
                 weight, modes=[0, 1], ranks=(out_rank, in_rank), init='svd')
             (out_channel_factor, in_channel_factor) = factors
 
-            # assign bias
             if self.out_channel_layer.bias is not None:
-                self.out_channel_layer.bias.data = conv_layer.bias.data
+                self.out_channel_layer.bias.data = layer.bias.data
 
-            # assign weights
             transposed = torch.transpose(in_channel_factor, 1, 0)
             self.in_channel_layer.weight.data = \
                 transposed.unsqueeze(-1).unsqueeze(-1)
@@ -109,31 +91,33 @@ class DecomposedConv2d(Module):
 
     def forward(self, x):
         """
-        Run forward propagation
+        Forward propagation.
         """
         x = self.in_channel_layer(x)
         x = self.core_layer(x)
         x = self.out_channel_layer(x)
-
         return x
 
     def recover(self):
         """
-        Recover original tensor from decomposed tensor
-
-        @return: 4D weight tensor with original layer's shape
+        Recover the original shape.
         """
         core = self.core_layer.weight.data
         out_factor = self.out_channel_layer.weight.data.squeeze()
         in_factor = self.in_channel_layer.weight.data.squeeze()
         in_factor = torch.transpose(in_factor, 1, 0)
-
-        recovered = tucker_to_tensor(core, [out_factor, in_factor])
-        return recovered
+        return tucker.tucker_to_tensor(core, [out_factor, in_factor])
 
 
-class DecomposedLinear(Module):
-    def __init__(self, layer: Module, ranks: tuple, hooi: bool = False):
+class DecomposedLinear(nn.Module):
+    """
+    Decomposed (or compressed) linear layer.
+    """
+
+    def __init__(self, layer, ranks, hooi=False):
+        """
+        Class initializer.
+        """
         super(DecomposedLinear, self).__init__()
 
         device = layer.weight.device
@@ -168,17 +152,10 @@ class DecomposedLinear(Module):
             self.core_layer.weight.data = core
 
     def forward(self, x):
+        """
+        Forward propagation.
+        """
         x = self.in_layer(x)
         x = self.core_layer(x)
         x = self.out_layer(x)
         return x
-
-    def recover(self):
-        pass
-        # core = self.core_layer.weight.data
-        # out_factor = self.out_channel_layer.weight.data.squeeze()
-        # in_factor = self.in_channel_layer.weight.data.squeeze()
-        # in_factor = torch.transpose(in_factor, 1, 0)
-        #
-        # recovered = tucker_to_tensor(core, [out_factor, in_factor])
-        # return recovered

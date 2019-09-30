@@ -1,29 +1,18 @@
-import abc
-
 import torch
-from torch import Tensor
 from torch import nn
 
 
-class Generator(nn.Module):
-    def __init__(self):
-        super(Generator, self).__init__()
-        self.num_classes = None
-        self.num_noises = None
+class DenseGenerator(nn.Module):
+    """
+    Generator for unstructured datasets.
+    """
 
-    @abc.abstractmethod
-    def forward(self, labels: Tensor, noises: Tensor, adjust: bool):
-        pass
-
-
-class DenseGenerator(Generator):
-    def __init__(self,
-                 num_noises: int,
-                 num_classes: int,
-                 num_features: int,
-                 n_layers: int = 1):
+    def __init__(self, num_classes, num_features, num_noises=10, units=120,
+                 n_layers=1):
+        """
+        Class initializer.
+        """
         super().__init__()
-        units = 120
         self.num_classes = num_classes
         self.num_noises = num_noises
 
@@ -41,15 +30,25 @@ class DenseGenerator(Generator):
         self.layers = nn.Sequential(*layers)
         self.adjust = nn.BatchNorm1d(num_features, affine=False)
 
-    def forward(self, labels: Tensor, noises: Tensor, adjust: bool = True) -> Tensor:
+    def forward(self, labels, noises, adjust=True):
+        """
+        Forward propagation.
+        """
         out = self.layers(torch.cat((noises, labels), dim=1))
         if adjust:
             out = self.adjust(out)
         return out
 
 
-class ImageGenerator(Generator):
-    def __init__(self, num_noises: int, num_classes: int, num_channels: int):
+class ImageGenerator(nn.Module):
+    """
+    Generator for image datasets.
+    """
+
+    def __init__(self, num_classes, num_channels, num_noises=10):
+        """
+        Class initializer.
+        """
         super(ImageGenerator, self).__init__()
 
         fc_nodes = [num_noises + num_classes, 256, 128]
@@ -79,38 +78,54 @@ class ImageGenerator(Generator):
             nn.Tanh())
 
     @staticmethod
-    def _normalize_images(layer: Tensor) -> Tensor:
+    def normalize_images(layer):
+        """
+        Normalize images into zero-mean and unit-variance.
+        """
         mean = layer.mean(dim=(2, 3), keepdim=True)
         std = layer.view((layer.size(0), layer.size(1), -1)) \
             .std(dim=2, keepdim=True).unsqueeze(3)
         return (layer - mean) / std
 
-    def forward(self, labels: Tensor, noises: Tensor, adjust: bool = True) -> Tensor:
+    def forward(self, labels, noises, adjust=True):
+        """
+        Forward propagation.
+        """
         out = self.fc(torch.cat((noises, labels), dim=1))
         out = self.conv(out.view((out.size(0), out.size(1), 1, 1)))
         if adjust:
-            out = self._normalize_images(out)
+            out = self.normalize_images(out)
         return out
 
 
 class Decoder(nn.Module):
-    def __init__(self, in_features: int, out_targets: int, n_layers: int):
+    """
+    Decoder for both unstructured and image datasets.
+    """
+
+    def __init__(self, in_features, out_targets, n_layers, units=120):
+        """
+        Class initializer.
+        """
         super(Decoder, self).__init__()
 
-        layers = [nn.Linear(in_features, 120),
+        layers = [nn.Linear(in_features, units),
                   nn.ELU(),
-                  nn.BatchNorm1d(120)]
+                  nn.BatchNorm1d(units)]
 
         for _ in range(n_layers):
             layers.extend([
-                nn.Linear(120, 120),
+                nn.Linear(units, units),
                 nn.ELU(),
-                nn.BatchNorm1d(120)])
+                nn.BatchNorm1d(units)])
 
-        layers.append(nn.Linear(120, out_targets))
+        layers.append(nn.Linear(units, out_targets))
         self.layers = nn.Sequential(*layers)
 
-    def forward(self, x: Tensor):
+    def forward(self, x):
+        """
+        Forward propagation.
+        """
         out = x.view((x.size(0), -1))
         out = self.layers(out)
         return out

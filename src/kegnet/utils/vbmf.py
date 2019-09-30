@@ -1,43 +1,29 @@
 """
-AlCom: Adversarial Layerwise Compression
-
-Authors: Taebum Kim (k.taebum@snu.ac.kr), U Kang (ukang@snu.ac.kr)
-                 Data Mining Lab, Seoul National University
-
-This software is free of charge under research purposes.
-For commercial purposes, please contact the authors.
-
--------------------------------------------------------------------------
-File: VBMF.py
-    - module for calculate empirical variational bayesian matrix factorization
-
-This code is got from 
+This code is based on the following:
 https://github.com/CasvandenBogaard/VBMF/blob/master/VBMF.py
-
-Version: 1.0
 """
 
 from __future__ import division
 
 import numpy as np
-from scipy.optimize import minimize_scalar
-# noinspection PyPep8Naming,SpellCheckingInspection
-from torch import Tensor
+from scipy import optimize
 
 
 # noinspection PyPep8Naming,SpellCheckingInspection
-def EVBMF(tensor: Tensor, sigma2=None, H=None):
-    """Implementation of the analytical solution to Empirical Variational Bayes
-    Matrix Factorization. This function can be used to calculate the analytical
-    solution to empirical VBMF. This is based on the paper and MatLab code by
-    Nakajima et al.: "Global analytic solution of fully-observed variational
-    Bayesian matrix factorization."
+def EVBMF(tensor, sigma2=None, H=None):
+    """
+    Implementation of the analytical solution to Empirical Variational Bayes
+    Matrix Factorization.
+
+    This function can be used to calculate the analytical solution to empirical
+    VBMF. This is based on the paper and MatLab code by Nakajima et al.:
+    "Global analytic solution of fully-observed variational Bayesian matrix
+    factorization."
 
     Notes
     -----
-        If sigma2 is unspecified, it is estimated by minimizing the free energy.
-        If H is unspecified, it is set to the smallest of the sides of the input
-        Y.
+    If sigma2 is unspecified, it is estimated by minimizing the free energy.
+    If H is unspecified, it is set to the smallest of the sides of the input Y.
 
     Attributes
     ----------
@@ -64,11 +50,12 @@ def EVBMF(tensor: Tensor, sigma2=None, H=None):
     post : dictionary
         Dictionary containing the computed posterior values.
 
+
     References
     ----------
-    .. [1] Nakajima, Shinichi, et al. "Global analytic solution of fully-
-    observed variational Bayesian matrix factorization." Journal of Machine
-    Learning Research 14.Jan (2013): 1-37.
+    .. [1] Nakajima, Shinichi, et al. "Global analytic solution of
+    fully-observed variational Bayesian matrix factorization." Journal of
+    Machine Learning Research 14.Jan (2013): 1-37.
 
     .. [2] Nakajima, Shinichi, et al. "Perfect dimensionality recovery by
     variational Bayesian PCA." Advances in Neural Information Processing
@@ -109,7 +96,7 @@ def EVBMF(tensor: Tensor, sigma2=None, H=None):
         lower_bound = lower_bound * scale
         upper_bound = upper_bound * scale
 
-        sigma2_opt = minimize_scalar(
+        sigma2_opt = optimize.minimize_scalar(
             EVBsigma2,
             args=(L, M, s, residual, xubar),
             bounds=[lower_bound, upper_bound],
@@ -153,23 +140,13 @@ def EVBMF(tensor: Tensor, sigma2=None, H=None):
 # noinspection PyPep8Naming,SpellCheckingInspection
 def EVBsigma2(sigma2, L, M, s, residual, xubar):
     """
-    For case when sigma2 is unspecified.
-    function for EVBMF function (minimization objective function)
-
-    @param sigma2: current value (do not pass arg explicitly)
-    @param L: width of target factorization matrix
-    @param M: height of target factorization matrix
-    @param s: singular values
-    @param residual: residual value (squared difference of target matrix and
-    singular value)
-    @param xubar: scaled taubar
-
-    @return: value of calculated sigma2 from given args
+    Function for EVBMF function (minimization objective function).
     """
 
     # noinspection PyShadowingNames
     def tau(x, alpha):
-        return 0.5 * (x - (1 + alpha) + np.sqrt((x - (1 + alpha)) ** 2 - 4 * alpha))
+        y = np.sqrt((x - (1 + alpha)) ** 2 - 4 * alpha)
+        return 0.5 * (x - (1 + alpha) + y)
 
     H = len(s)
 
@@ -185,6 +162,8 @@ def EVBsigma2(sigma2, L, M, s, residual, xubar):
     term3 = np.sum(np.log(np.divide(tau_z1 + 1, z1)))
     term4 = alpha * np.sum(np.log(tau_z1 / alpha + 1))
 
-    obj = term1 + term2 + term3 + term4 + residual / (M * sigma2) + (L - H) * np.log(sigma2)
+    obj1 = term1 + term2 + term3 + term4
+    obj2 = residual / (M * sigma2)
+    obj3 = (L - H) * np.log(sigma2)
 
-    return obj
+    return obj1 + obj2 + obj3

@@ -3,13 +3,13 @@ from typing import Callable
 
 import numpy as np
 import torch
-import torch.optim as optim
-from torch import nn
+from torch import optim, nn
 from torch.nn import Module
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from kegnet.classifier import loss as cls_loss
+from kegnet.generator import utils as gen_utils
 from kegnet.classifier import utils as cls_utils
 from kegnet.utils import data, utils
 
@@ -23,7 +23,6 @@ MAX_EPOCHS = 0
 DATASET = None
 BATCH_SIZE = 64
 NUM_BATCHES = 100
-LABEL_DIST = 'uniform'
 TEMPERATURE = 1
 
 
@@ -163,7 +162,6 @@ def prepare_data(data_dist: str,
             dataset=DATASET,
             batch_size=BATCH_SIZE,
             num_batches=NUM_BATCHES,
-            label_dist=LABEL_DIST,
             temperature=TEMPERATURE,
             adjust=True)
         loss_out = cls_loss.KLDivLoss().to(DEVICE)
