@@ -1,5 +1,4 @@
 import os
-import shutil
 
 import numpy as np
 import torch
@@ -15,15 +14,16 @@ from kegnet.utils import utils, data
 DEVICE = None
 
 
-def update(networks, losses, optimizer, **kwargs):
+def update(networks, losses, optimizer, alpha, beta):
+    """
+    Update generator and decoder networks for a single epoch.
+    """
+    batch_size = 256
+    num_batches = 100
+
     generator, classifier, decoder = networks
     cls_loss, dec_loss, div_loss = losses
     list_bs, list_loss, list_corr = [], [], []
-
-    batch_size = kwargs['batch_size']
-    num_batches = kwargs['num_batches']
-    alpha = kwargs['alpha']
-    beta = kwargs['beta']
 
     generator.train()
 
@@ -58,50 +58,68 @@ def update(networks, losses, optimizer, **kwargs):
     return accuracy, loss
 
 
-def visualize_images(generator, epoch, path):
-    os.makedirs(os.path.join(path, 'images'), exist_ok=True)
-    path_ = os.path.join(path, 'images/images-{:03d}.png'.format(epoch))
-    images = gen_utils.generate_data(generator, repeats=10, device=DEVICE)
+def visualize_images(generator, epoch, path, repeats=10):
+    """
+    Generate and visualize data for a generator.
+    """
+    generator.eval()
+    nz = generator.num_noises
+    ny = generator.num_classes
+
+    noises = gen_utils.sample_noises(size=(repeats, nz))
+    noises[0, :] = 0
+    noises = np.repeat(noises.detach().numpy(), repeats=ny, axis=0)
+    noises = torch.tensor(noises, dtype=torch.float32, device=DEVICE)
+
+    labels = np.zeros((ny, ny))
+    labels[np.arange(ny), np.arange(ny)] = 1
+    labels = np.tile(labels, (repeats, 1))
+    labels = torch.tensor(labels, dtype=torch.float32, device=DEVICE)
+
+    images = generator(labels, noises)
+    images = images.view(repeats, -1, *images.shape[1:])
     images = images.view(-1, *images.shape[2:])
-    save_image(images.detach(), path_, nrow=10, normalize=True)
+
+    os.makedirs(os.path.join(path, 'images'), exist_ok=True)
+    img_path = os.path.join(path, 'images/images-{:03d}.png'.format(epoch))
+    save_image(images.detach(), img_path, nrow=repeats, normalize=True)
 
 
-def set_if_none(variable, value):
-    return value if variable is None else variable
-
-
-def main(dataset, cls_path, index: int, path_out: str,
-         alpha: float = None, beta: float = None) -> str:
+# noinspection PyUnresolvedReferences
+def main(dataset, cls_path, index, out_path):
+    """
+    Main function for training a generator.
+    """
     global DEVICE
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     utils.set_seed(seed=2019 + index)
 
     num_epochs = 200
-    batch_size = 256
-    num_batches = 100
     save_every = 100
     viz_every = 10
+
+    assert num_epochs >= save_every
 
     if dataset == 'mnist':
         dec_layers = 1
         lrn_rate = 1e-3
-        alpha = set_if_none(alpha, 1)
-        beta = set_if_none(beta, 0)
+        alpha = 1
+        beta = 0
     elif dataset == 'fashion':
         dec_layers = 3
         lrn_rate = 1e-2
-        alpha = set_if_none(alpha, 1)
-        beta = set_if_none(beta, 10)
+        alpha = 1
+        beta = 10
     elif dataset == 'svhn':
         dec_layers = 3
         lrn_rate = 1e-2
-        alpha = set_if_none(alpha, 1)
-        beta = set_if_none(beta, 1)
+        alpha = 1
+        beta = 1
     else:
         dec_layers = 2
         lrn_rate = 1e-4
-        alpha = set_if_none(alpha, 1)
-        beta = set_if_none(beta, 0)
+        alpha = 1
+        beta = 0
 
     cls_network = cls_utils.init_classifier(dataset).to(DEVICE)
     gen_network = gen_utils.init_generator(dataset).to(DEVICE)
@@ -113,15 +131,13 @@ def main(dataset, cls_path, index: int, path_out: str,
 
     networks = (gen_network, cls_network, dec_network)
 
-    path_loss = os.path.join(path_out, 'loss-gen.txt')
-    path_model = os.path.join(path_out, 'generator')
-    path_result = None
+    path_loss = os.path.join(out_path, 'loss-gen.txt')
+    dir_model = os.path.join(out_path, 'generator')
+    path_model = None
 
-    if os.path.exists(path_out):
-        shutil.rmtree(path_out)
-    os.makedirs(path_out)
+    os.makedirs(out_path, exist_ok=True)
     with open(path_loss, 'w') as f:
-        f.write('Epoch\tClsLoss\tDecLoss\tDivLoss\tLossSum\tAccr\n')
+        f.write('Epoch\tClsLoss\tDecLoss\tDivLoss\tLossSum\tAccuracy\n')
 
     loss1 = gen_loss.ReconstructionLoss(method='kld').to(DEVICE)
     loss2 = gen_loss.ReconstructionLoss(method='l2').to(DEVICE)
@@ -133,11 +149,7 @@ def main(dataset, cls_path, index: int, path_out: str,
 
     for epoch in range(1, num_epochs + 1):
         trn_acc, trn_losses = update(
-            networks, losses, optimizer,
-            batch_size=batch_size,
-            num_batches=num_batches,
-            alpha=alpha,
-            beta=beta)
+            networks, losses, optimizer, alpha, beta)
 
         with open(path_loss, 'a') as f:
             f.write('{:3d}'.format(epoch))
@@ -146,12 +158,12 @@ def main(dataset, cls_path, index: int, path_out: str,
             f.write('\t{:.8f}\n'.format(trn_acc))
 
         if viz_every > 0 and epoch % viz_every == 0:
-            visualize_images(gen_network, epoch, path_out)
+            visualize_images(gen_network, epoch, out_path)
 
         if epoch % save_every == 0:
-            p = '{}-{:03d}.pth.tar'.format(path_model, epoch)
+            p = '{}-{:03d}.pth.tar'.format(dir_model, epoch)
             utils.save_checkpoints(gen_network, p)
-            path_result = p
+            path_model = p
 
     print('Finished training the generator (index={}).'.format(index))
-    return path_result
+    return path_model

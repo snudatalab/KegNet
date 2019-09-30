@@ -37,28 +37,3 @@ def init_generator(dataset):
         return models.ImageGenerator(d.ny, d.nc)
     else:
         return models.DenseGenerator(d.ny, d.nx, n_layers=2)
-
-
-def generate_data(generator,
-                  repeats: int,
-                  adjust: bool = True,
-                  device: torch.device = None):
-    generator.eval()
-
-    num_noises = generator.num_noises
-    num_classes = generator.num_classes
-
-    noises = sample_noises(size=(repeats, num_noises))
-    noises[0, :] = 0
-    noises = np.repeat(noises.detach().numpy(), repeats=num_classes, axis=0)
-    noises = torch.tensor(noises, dtype=torch.float32, device=device)
-
-    labels = np.zeros((num_classes, num_classes))
-    # labels[:, 0] = np.array(range(9, -1, -1)) / 9
-    # labels[:, 5] = np.array(range(0, 10)) / 9
-    labels[np.arange(num_classes), np.arange(num_classes)] = 1
-    labels = np.tile(labels, (repeats, 1))
-    labels = torch.tensor(labels, dtype=torch.float32, device=device)
-
-    fake_data = generator.forward(labels, noises, adjust)
-    return fake_data.view(repeats, -1, *fake_data.shape[1:])
