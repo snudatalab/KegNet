@@ -20,7 +20,7 @@ You can download [this bib file](docs/YooCKK19.bib) or copy the following inform
 @inproceedings{YooCKK19,
   author    = {Jaemin Yoo and Minyong Cho and Taebum Kim and U Kang},
   title     = {Knowledge Extraction with No Observable Data},
-  booktitle = {Conference on Neural Information Processing Systems (ICDM)},
+  booktitle = {Conference on Neural Information Processing Systems (NeurIPS)},
   year      = {2019}
 }
 ```
