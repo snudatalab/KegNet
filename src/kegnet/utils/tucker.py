@@ -36,7 +36,7 @@ class DecomposedConv2d(nn.Module):
             raise ValueError(ranks)
         return out_rank, in_rank
 
-    def __init__(self, layer, ranks='evbmf', initialize=True):
+    def __init__(self, layer, ranks='evbmf', init=True):
         """
         Class initializer.
         """
@@ -74,7 +74,7 @@ class DecomposedConv2d(nn.Module):
             dilation=layer.dilation,
             bias=layer.bias is not None).to(device)
 
-        if initialize:
+        if init:
             core, factors = decomp.partial_tucker(
                 weight, modes=[0, 1], ranks=(out_rank, in_rank), init='svd')
             (out_channel_factor, in_channel_factor) = factors
@@ -114,7 +114,7 @@ class DecomposedLinear(nn.Module):
     Decomposed (or compressed) linear layer.
     """
 
-    def __init__(self, layer, ranks, hooi=False):
+    def __init__(self, layer, ranks, init=True):
         """
         Class initializer.
         """
@@ -140,7 +140,7 @@ class DecomposedLinear(nn.Module):
             out_features=out_dim,
             bias=layer.bias is not None).to(device)
 
-        if hooi:
+        if init:
             core, factors = decomp.tucker(weight, ranks=ranks, init='svd')
             out_factor, in_factor = factors
 

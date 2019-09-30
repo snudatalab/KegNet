@@ -1,51 +1,65 @@
-import torch
 from torch import nn
 
 from kegnet.utils import tucker
 
 
 class MLP(nn.Module):
-    def _to_layers(self, units: int):
-        in_features = self.in_features
-        drop_probability = self.drop_prob
-        n_layers = self.n_layers
-        num_classes = self.num_classes
+    """
+    Class for a multilayer perceptron (MLP).
+    """
 
-        layers = [nn.Linear(in_features, units),
-                  nn.ELU(),
-                  nn.Dropout(drop_probability)]
-
-        for n in range(n_layers):
-            layers.extend([nn.Linear(units, units),
-                           nn.ELU(),
-                           nn.Dropout(drop_probability)])
-
-        layers.append(nn.Linear(units, num_classes))
-        return nn.Sequential(*layers)
-
-    def __init__(self, in_features: int, num_classes: int, n_layers: int = 10):
+    def __init__(self, in_features, num_classes, units=100, drop_prob=0.15,
+                 n_layers=10):
+        """
+        Class initializer.
+        """
         super().__init__()
         self.in_features = in_features
         self.num_classes = num_classes
-        self.units = 100
-        self.drop_prob = 0.15
+        self.units = units
+        self.drop_prob = drop_prob
         self.n_layers = n_layers
-        self.layers = self._to_layers(self.units)
 
-    def forward(self, x: torch.Tensor):
+        layers = []
+        size_in = in_features
+        for n in range(n_layers + 1):
+            layers.extend([nn.Linear(size_in, units),
+                           nn.ELU(),
+                           nn.Dropout(drop_prob)])
+            size_in = units
+        layers.append(nn.Linear(units, num_classes))
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        """
+        Forward propagation.
+        """
         return self.layers(x)
 
-    def compress(self, units: int, hooi: bool):
+    def compress_layers(self, units):
+        """
+        Compress its layers.
+        """
         layers = []
         for layer in self.layers:
             if hasattr(layer, 'weight'):
                 new_ranks = []
                 for rank in layer.weight.shape:
                     if rank == self.units:
-                        new_ranks.append(int(units))
+                        new_ranks.append(units)
                     else:
                         new_ranks.append(rank)
-                layer = tucker.DecomposedLinear(layer, tuple(new_ranks), hooi=hooi)
+                layer = tucker.DecomposedLinear(layer, tuple(new_ranks))
             layers.append(layer)
-
         self.layers = nn.Sequential(*layers)
+
+    def compress(self, option):
+        """
+        Compress the network based on the option.
+        """
+        if option == 1:
+            self.compress_layers(units=10)
+        elif option == 2:
+            self.compress_layers(units=5)
+        else:
+            raise ValueError()

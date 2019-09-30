@@ -1,27 +1,43 @@
 """
 https://github.com/KellerJordan/ResNet-PyTorch-CIFAR10/blob/master/model.py
 """
-import torch.nn as nn
-import torch.nn.functional as func
-from torch import Tensor
+from torch import nn
+from torch.nn import functional as func
 
 from kegnet.utils import tucker
 
 
 class IdentityMapping(nn.Module):
-    def __init__(self, num_filters: int, channels_in: int, stride: int):
+    """
+    Class for identity mappings in ResNet.
+    """
+
+    def __init__(self, num_filters, channels_in, stride):
+        """
+        Class initializer.
+        """
         super(IdentityMapping, self).__init__()
         self.identity = nn.MaxPool2d(1, stride=stride)
         self.num_zeros = num_filters - channels_in
 
     def forward(self, x):
+        """
+        Forward propagation.
+        """
         out = func.pad(x, [0, 0, 0, 0, 0, self.num_zeros])
         out = self.identity(out)
         return out
 
 
 class ResBlock(nn.Module):
-    def __init__(self, num_filters: int, channels_in: int = None, stride: int = 1):
+    """
+    Class for residual blocks in ResNet.
+    """
+
+    def __init__(self, num_filters, channels_in=None, stride=1):
+        """
+        Class initializer.
+        """
         super(ResBlock, self).__init__()
 
         if channels_in is None or channels_in == num_filters:
@@ -38,7 +54,10 @@ class ResBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(num_filters)
         self.relu2 = nn.ReLU(inplace=True)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
+        """
+        Forward propagation.
+        """
         residual = x
 
         out = self.conv1(x)
@@ -58,7 +77,14 @@ class ResBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, num_channels: int, num_classes: int, n: int = 9):
+    """
+    Class for a ResNet classifier.
+    """
+
+    def __init__(self, num_channels, num_classes, n=2):
+        """
+        Class initializer.
+        """
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(num_channels, 16, 3, 1, 1)
         self.norm1 = nn.BatchNorm2d(16)
@@ -70,13 +96,19 @@ class ResNet(nn.Module):
         self.linear = nn.Linear(64, num_classes)
 
     @staticmethod
-    def _make_layer(n: int, num_filters: int, channels_in: int, stride: int):
+    def _make_layer(n, num_filters, channels_in, stride):
+        """
+        Make a single layer.
+        """
         layers = [ResBlock(num_filters, channels_in, stride)]
         for _ in range(1, n):
             layers.append(ResBlock(num_filters))
         return nn.Sequential(*layers)
 
-    def forward(self, x: Tensor):
+    def forward(self, x):
+        """
+        Forward propagation.
+        """
         out = self.conv1(x)
         out = self.norm1(out)
         out = self.relu1(out)
@@ -88,21 +120,28 @@ class ResNet(nn.Module):
         out = self.linear(out)
         return out
 
-    def compress(self, target: tuple, rank: object, hooi: bool):
-        for layer in self.layers3:
-            if 1 in target:
-                layer.conv1 = tucker.DecomposedConv2d(layer.conv1, rank, hooi)
-            if 2 in target:
-                layer.conv2 = tucker.DecomposedConv2d(layer.conv2, rank, hooi)
+    def compress_blocks(self, block):
+        """
+        Compress specific blocks of the third layer.
+        """
+        for l in self.layers3:
+            if block == 1:
+                l.conv1 = tucker.DecomposedConv2d(l.conv1)
+            elif block == 2:
+                l.conv2 = tucker.DecomposedConv2d(l.conv2)
+            else:
+                raise ValueError(block)
 
-
-def resnet14(**kwargs) -> ResNet:
-    return ResNet(n=2, **kwargs)
-
-
-def resnet20(**kwargs) -> ResNet:
-    return ResNet(n=3, **kwargs)
-
-
-def resnet56(**kwargs) -> ResNet:
-    return ResNet(n=9, **kwargs)
+    def compress(self, option):
+        """
+        Compress the network based on the option.
+        """
+        if option == 1:
+            self.compress_blocks(block=1)
+        elif option == 2:
+            self.compress_blocks(block=2)
+        elif option == 3:
+            self.compress_blocks(block=1)
+            self.compress_blocks(block=2)
+        else:
+            raise ValueError()

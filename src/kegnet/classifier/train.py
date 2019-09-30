@@ -181,9 +181,9 @@ def prepare_data(data_dist: str,
     return loader_out, loss_out
 
 
-def compress_classifier(model: Module, option: int, path: str):
+def compress_classifier(model, option, path):
     size_before = utils.count_parameters(model)
-    cls_utils.compress_classifier(model, option)
+    model.compress(option)
     size_after = utils.count_parameters(model)
     with open(path, 'w') as f:
         f.write('Parameters (before compression): {}\n'.format(size_before))
