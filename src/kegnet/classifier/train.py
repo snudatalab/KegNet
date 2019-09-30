@@ -6,11 +6,12 @@ import torch
 from torch import optim, nn
 from torch.nn import Module
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from kegnet.classifier import loss as cls_loss
 from kegnet.classifier import utils as cls_utils
 from kegnet.utils import data, utils
+from kegnet.generator import utils as gen_utils
 
 DEVICE = None
 L_RATE = 1e-2
@@ -22,7 +23,6 @@ MAX_EPOCHS = 0
 DATASET = None
 BATCH_SIZE = 64
 NUM_BATCHES = 100
-TEMPERATURE = 1
 
 
 def set_parameters_for_teacher(dataset: str):
@@ -134,48 +134,39 @@ def eval_classifier(classifier: Module, loader: DataLoader, loss_func: Callable)
     return loss, accuracy
 
 
-def prepare_data(data_dist: str,
-                 teacher: Module,
-                 loader: DataLoader = None,
-                 generators: list = None):
-    if data_dist == 'real':
-        loader_out = loader
-        loss_out = nn.CrossEntropyLoss().to(DEVICE)
-    elif data_dist == 'kegnet':
-        loader_out = utils.prepare_fake_data(
-            teacher,
-            generators=generators,
-            device=DEVICE,
-            dataset=DATASET,
-            batch_size=BATCH_SIZE,
-            num_batches=NUM_BATCHES,
-            temperature=TEMPERATURE,
-            adjust=True)
-        loss_out = cls_loss.KLDivLoss().to(DEVICE)
+def predict_labels(teacher, sampled_data, batch_size):
+    teacher.eval()
+    softmax = nn.Softmax(dim=1)
+    loader = DataLoader(TensorDataset(sampled_data), batch_size=256)
+    labels = []
+    for x, in loader:
+        labels.append(teacher(x).detach())
+    labels = softmax(torch.cat(tuple(labels), dim=0))
+    return DataLoader(TensorDataset(sampled_data, labels), batch_size)
+
+
+def prepare_data(teacher, data_dist, generators=None):
+    num_data = BATCH_SIZE * NUM_BATCHES
+    if data_dist == 'kegnet':
+        sampled_data = gen_utils.sample_kegnet_data(
+            DATASET, num_data, generators, DEVICE)
     elif data_dist in ('uniform', 'normal'):
-        loader_out = utils.prepare_random_data(
-            teacher,
-            dataset=DATASET,
-            batch_size=BATCH_SIZE,
-            num_batches=NUM_BATCHES,
-            dist=data_dist,
-            temperature=TEMPERATURE,
-            device=DEVICE)
-        loss_out = cls_loss.KLDivLoss().to(DEVICE)
+        sampled_data = gen_utils.sample_random_data(
+            DATASET, num_data, data_dist, DEVICE)
     else:
         raise ValueError()
 
-    return loader_out, loss_out
+    return predict_labels(teacher, sampled_data, BATCH_SIZE)
 
 
 def compress_classifier(model, option, path):
-    size_before = utils.count_parameters(model)
+    size_before = cls_utils.count_parameters(model)
     model.compress(option)
-    size_after = utils.count_parameters(model)
+    size_after = cls_utils.count_parameters(model)
     with open(path, 'w') as f:
-        f.write('Parameters (before compression): {}\n'.format(size_before))
-        f.write('Parameters (after compression): {}\n'.format(size_after))
-        f.write('Compression ratio: {:2f}\n'.format(size_before / size_after))
+        f.write(f'Parameters (before compression): {size_before}\n')
+        f.write(f'Parameters (after compression): {size_after}\n')
+        f.write(f'Compression ratio: {size_before / size_after:2f}\n')
 
 
 def get_loss_name(data_dist: str, option: int) -> str:
@@ -218,10 +209,19 @@ def main(dataset: str,
         utils.load_checkpoints(model_t, teacher, DEVICE)
 
     loaders = data.to_dataset(DATASET).to_loaders(BATCH_SIZE)
+
+    if data_dist == 'real':
+        trn_loss = nn.CrossEntropyLoss().to(DEVICE)
+    else:
+        trn_loss = cls_loss.KLDivLoss().to(DEVICE)
     test_loss = nn.CrossEntropyLoss().to(DEVICE)
-    train_data = prepare_data(data_dist, model_t, loaders[0], generators)
-    valid_data = loaders[1], test_loss
-    test_data = loaders[2], test_loss
+
+    if data_dist == 'real':
+        trn_data = loaders[0]
+    else:
+        trn_data = prepare_data(model_t, data_dist, generators)
+    val_data = loaders[1]
+    test_data = loaders[2]
 
     if data_dist != 'real':
         compress_classifier(model_t, option, path_comp)
@@ -235,10 +235,10 @@ def main(dataset: str,
         best_acc, best_epoch = 0, 0
         for epoch in range(MAX_EPOCHS + 1):
             if epoch > 0:
-                learn_classifier(model_s, *train_data, optimizer=optimizer)
-            train_results = eval_classifier(model_s, *train_data)
-            valid_results = eval_classifier(model_s, *valid_data)
-            test_results = eval_classifier(model_s, *test_data)
+                learn_classifier(model_s, trn_data, trn_loss, optimizer)
+            train_results = eval_classifier(model_s, trn_data, trn_loss)
+            valid_results = eval_classifier(model_s, val_data, test_loss)
+            test_results = eval_classifier(model_s, test_data, test_loss)
 
             _, valid_acc = valid_results
             if valid_acc > best_acc:

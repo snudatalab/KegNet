@@ -1,3 +1,5 @@
+import numpy as np
+
 from kegnet.classifier.models import lenet, resnet, linear
 from kegnet.utils import data
 
@@ -13,3 +15,13 @@ def init_classifier(dataset):
         return resnet.ResNet(d.nc, d.ny)
     else:
         return linear.MLP(d.nx, d.ny)
+
+
+def count_parameters(model):
+    """
+    Count the parameters of a classifier.
+    """
+    size = 0
+    for parameter in model.parameters():
+        size += np.prod(parameter.shape)
+    return size

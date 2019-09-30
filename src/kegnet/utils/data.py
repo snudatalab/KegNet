@@ -6,13 +6,15 @@ import pandas as pd
 import torch
 import torchvision.datasets as torch_datasets
 import torchvision.transforms as transforms
-from numpy import ndarray
 from torch.utils.data import DataLoader, SubsetRandomSampler, TensorDataset
 
 ROOT_PATH = '../data'
 
 
-def _normalize(arr: ndarray) -> ndarray:
+def _normalize(arr):
+    """
+    Normalize a numpy array into zero-mean and unit-variance.
+    """
     avg = arr.mean(axis=0)
     std = arr.std(axis=0)
     arr = arr - avg
@@ -20,7 +22,10 @@ def _normalize(arr: ndarray) -> ndarray:
     return arr
 
 
-def _split2(nd: int, seed: int = 2019):
+def _split2(nd, seed=2019):
+    """
+    Split data into the 7:1 ratios.
+    """
     shuffled_index = np.arange(nd)
     np.random.seed(seed)
     np.random.shuffle(shuffled_index)
@@ -30,7 +35,10 @@ def _split2(nd: int, seed: int = 2019):
     return index1, index2
 
 
-def _split3(nd: int, seed: int = 2019):
+def _split3(nd, seed=2019):
+    """
+    Split data into the 7:1:2 ratios.
+    """
     shuffled_index = np.arange(nd)
     np.random.seed(seed)
     np.random.shuffle(shuffled_index)

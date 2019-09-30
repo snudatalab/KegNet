@@ -3,7 +3,6 @@ import os
 import numpy as np
 import torch
 from torch import optim
-from torchvision.utils import save_image
 
 from kegnet.classifier import utils as cls_utils
 from kegnet.generator import loss as gen_loss
@@ -58,35 +57,7 @@ def update(networks, losses, optimizer, alpha, beta):
     return accuracy, loss
 
 
-def visualize_images(generator, epoch, path, repeats=10):
-    """
-    Generate and visualize data for a generator.
-    """
-    generator.eval()
-    nz = generator.num_noises
-    ny = generator.num_classes
-
-    noises = gen_utils.sample_noises(size=(repeats, nz))
-    noises[0, :] = 0
-    noises = np.repeat(noises.detach().numpy(), repeats=ny, axis=0)
-    noises = torch.tensor(noises, dtype=torch.float32, device=DEVICE)
-
-    labels = np.zeros((ny, ny))
-    labels[np.arange(ny), np.arange(ny)] = 1
-    labels = np.tile(labels, (repeats, 1))
-    labels = torch.tensor(labels, dtype=torch.float32, device=DEVICE)
-
-    images = generator(labels, noises)
-    images = images.view(repeats, -1, *images.shape[1:])
-    images = images.view(-1, *images.shape[2:])
-
-    os.makedirs(os.path.join(path, 'images'), exist_ok=True)
-    img_path = os.path.join(path, 'images/images-{:03d}.png'.format(epoch))
-    save_image(images.detach(), img_path, nrow=repeats, normalize=True)
-
-
-# noinspection PyUnresolvedReferences
-def main(dataset, cls_path, index, out_path):
+def main(dataset, index, cls_path, out_path):
     """
     Main function for training a generator.
     """
@@ -135,7 +106,7 @@ def main(dataset, cls_path, index, out_path):
     dir_model = os.path.join(out_path, 'generator')
     path_model = None
 
-    os.makedirs(out_path, exist_ok=True)
+    os.makedirs(os.path.join(out_path, 'images'), exist_ok=True)
     with open(path_loss, 'w') as f:
         f.write('Epoch\tClsLoss\tDecLoss\tDivLoss\tLossSum\tAccuracy\n')
 
@@ -152,18 +123,19 @@ def main(dataset, cls_path, index, out_path):
             networks, losses, optimizer, alpha, beta)
 
         with open(path_loss, 'a') as f:
-            f.write('{:3d}'.format(epoch))
+            f.write(f'{epoch:3d}')
             for loss in trn_losses:
-                f.write('\t{:.8f}'.format(loss))
-            f.write('\t{:.8f}\n'.format(trn_acc))
+                f.write(f'\t{loss:.8f}')
+            f.write(f'\t{trn_acc:.8f}\n')
 
         if viz_every > 0 and epoch % viz_every == 0:
-            visualize_images(gen_network, epoch, out_path)
+            path = os.path.join(out_path, f'images/images-{epoch:03d}.png')
+            gen_utils.visualize_images(gen_network, path, DEVICE)
 
         if epoch % save_every == 0:
-            p = '{}-{:03d}.pth.tar'.format(dir_model, epoch)
-            utils.save_checkpoints(gen_network, p)
-            path_model = p
+            path = f'{dir_model}-{epoch:03d}.pth.tar'
+            utils.save_checkpoints(gen_network, path)
+            path_model = path
 
-    print('Finished training the generator (index={}).'.format(index))
+    print(f'Finished training the generator (index={index}).')
     return path_model
