@@ -1,3 +1,15 @@
+"""
+Knowledge Extraction with No Observable Data (NeurIPS 2019)
+
+Authors:
+- Jaemin Yoo (jaeminyoo@snu.ac.kr), Seoul National University
+- Minyong Cho (chominyong@gmail.com), Seoul National University
+- Taebum Kim (k.taebum@snu.ac.kr), Seoul National University
+- U Kang (ukang@snu.ac.kr), Seoul National University
+
+This software may be used only for research evaluation purposes.
+For other purposes (e.g., commercial), please contact the authors.
+"""
 import numpy as np
 
 from kegnet.classifier.models import lenet, resnet, linear

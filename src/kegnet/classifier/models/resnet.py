@@ -1,4 +1,16 @@
 """
+Knowledge Extraction with No Observable Data (NeurIPS 2019)
+
+Authors:
+- Jaemin Yoo (jaeminyoo@snu.ac.kr), Seoul National University
+- Minyong Cho (chominyong@gmail.com), Seoul National University
+- Taebum Kim (k.taebum@snu.ac.kr), Seoul National University
+- U Kang (ukang@snu.ac.kr), Seoul National University
+
+This software may be used only for research evaluation purposes.
+For other purposes (e.g., commercial), please contact the authors.
+
+This code is based on
 https://github.com/KellerJordan/ResNet-PyTorch-CIFAR10/blob/master/model.py
 """
 from torch import nn

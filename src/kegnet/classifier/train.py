@@ -1,3 +1,15 @@
+"""
+Knowledge Extraction with No Observable Data (NeurIPS 2019)
+
+Authors:
+- Jaemin Yoo (jaeminyoo@snu.ac.kr), Seoul National University
+- Minyong Cho (chominyong@gmail.com), Seoul National University
+- Taebum Kim (k.taebum@snu.ac.kr), Seoul National University
+- U Kang (ukang@snu.ac.kr), Seoul National University
+
+This software may be used only for research evaluation purposes.
+For other purposes (e.g., commercial), please contact the authors.
+"""
 import os
 
 import numpy as np
@@ -7,8 +19,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from kegnet.classifier import loss as cls_loss
 from kegnet.classifier import utils as cls_utils
-from kegnet.utils import data, utils
 from kegnet.generator import utils as gen_utils
+from kegnet.utils import data, utils
 
 DEVICE = None
 

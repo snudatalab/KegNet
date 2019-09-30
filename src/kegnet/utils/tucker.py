@@ -1,7 +1,19 @@
+"""
+Knowledge Extraction with No Observable Data (NeurIPS 2019)
+
+Authors:
+- Jaemin Yoo (jaeminyoo@snu.ac.kr), Seoul National University
+- Minyong Cho (chominyong@gmail.com), Seoul National University
+- Taebum Kim (k.taebum@snu.ac.kr), Seoul National University
+- U Kang (ukang@snu.ac.kr), Seoul National University
+
+This software may be used only for research evaluation purposes.
+For other purposes (e.g., commercial), please contact the authors.
+"""
 import tensorly as tl
+import torch
 from tensorly import decomposition as decomp
 from tensorly import tucker_tensor as tucker
-import torch
 from torch import nn
 
 from kegnet.utils import vbmf
