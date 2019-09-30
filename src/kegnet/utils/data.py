@@ -1,4 +1,3 @@
-import abc
 import os
 
 import numpy as np
@@ -48,7 +47,10 @@ def _split3(nd, seed=2019):
     return index1, index2, index3
 
 
-def _get_samplers(num_data: int, num_valid_data: int, seed: int):
+def _get_samplers(num_data, num_valid_data, seed):
+    """
+    Return a pair of samplers for the image datasets.
+    """
     indices = np.arange(num_data)
     np.random.seed(seed)
     np.random.shuffle(indices)
@@ -58,7 +60,10 @@ def _get_samplers(num_data: int, num_valid_data: int, seed: int):
     return train_sampler, valid_sampler
 
 
-def _to_image_loaders(trn_data, val_data, test_data, batch_size: int):
+def _to_image_loaders(trn_data, val_data, test_data, batch_size):
+    """
+    Convert an image dataset into loaders.
+    """
     samplers = _get_samplers(len(trn_data), 5000, seed=2019)
     trn_l = DataLoader(trn_data, batch_size, sampler=samplers[0])
     val_l = DataLoader(val_data, batch_size, sampler=samplers[1])
@@ -66,50 +71,48 @@ def _to_image_loaders(trn_data, val_data, test_data, batch_size: int):
     return trn_l, val_l, test_l
 
 
-class Data:
-    def __init__(self):
-        self.nx = None
-        self.ny = None
-        self.nc = None
-        self.size = None
+class MNIST:
+    """
+    Class for the MNIST dataset.
+    """
+    nx = 1024
+    ny = 10
+    nc = 1
+    size = 1, 32, 32
 
-    @abc.abstractmethod
-    def to_loaders(self, batch_size: int) -> tuple:
-        pass
-
-
-class MNIST(Data):
-    def __init__(self):
-        super().__init__()
-        self.nx = 1024
-        self.ny = 10
-        self.nc = 1
-        self.size = 1, 32, 32
-
-    def to_loaders(self, batch_size: int):
-        path = '{}/mnist'.format(ROOT_PATH)
+    @staticmethod
+    def to_loaders(batch_size):
+        """
+        Convert the dataset into data loaders.
+        """
+        path = f'{ROOT_PATH}/mnist'
         transform = transforms.Compose([
             transforms.Resize(32),
             transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))
-        ])
+            transforms.Normalize((0.1307,), (0.3081,))])
 
         trn_data = torch_datasets.MNIST(
             path, train=True, transform=transform, download=True)
-        test_data = torch_datasets.MNIST(path, train=False, transform=transform)
+        test_data = torch_datasets.MNIST(
+            path, train=False, transform=transform)
         return _to_image_loaders(trn_data, trn_data, test_data, batch_size)
 
 
-class Fashion(Data):
-    def __init__(self):
-        super().__init__()
-        self.nx = 1024
-        self.ny = 10
-        self.nc = 1
-        self.size = 1, 32, 32
+class Fashion:
+    """
+    Class for the Fashion MNIST dataset.
+    """
+    nx = 1024
+    ny = 10
+    nc = 1
+    size = 1, 32, 32
 
-    def to_loaders(self, batch_size: int):
-        path = '{}/fashion'.format(ROOT_PATH)
+    @staticmethod
+    def to_loaders(batch_size):
+        """
+        Convert the dataset into data loaders.
+        """
+        path = f'{ROOT_PATH}/fashion'
         stat = ((0.2856,), (0.3385,))
 
         train_trans = transforms.Compose([
@@ -126,21 +129,28 @@ class Fashion(Data):
 
         trn_data = torch_datasets.FashionMNIST(
             path, train=True, transform=train_trans, download=True)
-        val_data = torch_datasets.FashionMNIST(path, train=True, transform=test_trans)
-        test_data = torch_datasets.FashionMNIST(path, train=False, transform=test_trans)
+        val_data = torch_datasets.FashionMNIST(
+            path, train=True, transform=test_trans)
+        test_data = torch_datasets.FashionMNIST(
+            path, train=False, transform=test_trans)
         return _to_image_loaders(trn_data, val_data, test_data, batch_size)
 
 
-class SVHN(Data):
-    def __init__(self):
-        super().__init__()
-        self.nx = 1024 * 3
-        self.ny = 10
-        self.nc = 3
-        self.size = 3, 32, 32
+class SVHN:
+    """
+    Class for the SVHN dataset.
+    """
+    nx = 1024 * 3
+    ny = 10
+    nc = 3
+    size = 3, 32, 32
 
-    def to_loaders(self, batch_size: int):
-        path = '{}/svhn'.format(ROOT_PATH)
+    @staticmethod
+    def to_loaders(batch_size):
+        """
+        Convert the dataset into data loaders.
+        """
+        path = f'{ROOT_PATH}/svhn'
         stat = ((0.4378, 0.4439, 0.4729), (0.1980, 0.2011, 0.1971))
 
         trans = transforms.Compose([
@@ -152,9 +162,32 @@ class SVHN(Data):
         return _to_image_loaders(trn_data, trn_data, test_data, batch_size)
 
 
-class UCI(Data):
+class UCI:
+    """
+    Class for the UCI datasets.
+    """
+
+    def __init__(self, dataset):
+        """
+        Class initializer.
+        """
+        super().__init__()
+        df_list = self._read_dfs(dataset, path='../data')
+        trn_x, trn_y, val_x, val_y, test_x, test_y, nx, ny = self._preprocess(df_list)
+        self.nx = nx
+        self.ny = ny
+        self.nc = None
+        self.size = self.nx,
+
+        self.trn_data = torch.tensor(trn_x), torch.tensor(trn_y)
+        self.val_data = torch.tensor(val_x), torch.tensor(val_y)
+        self.test_data = torch.tensor(test_x), torch.tensor(test_y)
+
     @staticmethod
-    def _read_dfs(dataset: str, path: str):
+    def _read_dfs(dataset, path):
+        """
+        Read DataFrames of raw data.
+        """
         df_list = []
         for mode in ['-', 'train', 'test']:
             if mode == '-':
@@ -169,7 +202,10 @@ class UCI(Data):
         return df_list
 
     @staticmethod
-    def _preprocess(df_list: list):
+    def _preprocess(df_list):
+        """
+        Preprocess a dataset based on its properties.
+        """
         if len(df_list) == 1:
             df = df_list[0]
             arr_x = df.iloc[:, :-1].values.astype(np.float32)
@@ -215,20 +251,10 @@ class UCI(Data):
 
         return trn_x, trn_y, val_x, val_y, test_x, test_y, nx, ny
 
-    def __init__(self, dataset: str):
-        super().__init__()
-        df_list = self._read_dfs(dataset, path='../data')
-        trn_x, trn_y, val_x, val_y, test_x, test_y, nx, ny = self._preprocess(df_list)
-        self.nx = nx
-        self.ny = ny
-        self.nc = None
-        self.size = self.nx,
-
-        self.trn_data = torch.tensor(trn_x), torch.tensor(trn_y)
-        self.val_data = torch.tensor(val_x), torch.tensor(val_y)
-        self.test_data = torch.tensor(test_x), torch.tensor(test_y)
-
-    def to_loaders(self, batch_size: int) -> tuple:
+    def to_loaders(self, batch_size):
+        """
+        Convert the dataset into data loaders.
+        """
         trn_l = DataLoader(TensorDataset(*self.trn_data), batch_size)
         val_l = DataLoader(TensorDataset(*self.val_data), batch_size)
         test_l = DataLoader(TensorDataset(*self.test_data), batch_size)
@@ -247,13 +273,3 @@ def to_dataset(dataset):
         return SVHN()
     else:
         return UCI(dataset)
-
-
-def get_uci_datasets() -> list:
-    return ['letter',
-            'pendigits',
-            'statlog-shuttle']
-
-
-def is_uci(dataset: str) -> bool:
-    return os.path.exists('../data/uci/{}'.format(dataset))
