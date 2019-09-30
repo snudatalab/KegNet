@@ -9,15 +9,6 @@ from kegnet.generator import utils as gen_utils
 from kegnet.utils import data
 
 
-def set_device(gpu: int, n_gpu: int = 7):
-    if gpu is None:
-        return torch.device('cpu')
-    else:
-        gpu = gpu % n_gpu
-        device = 'cuda:{}'.format(gpu) if gpu is not None else 'cuda'
-        return torch.device(device if torch.cuda.is_available() else 'cpu')
-
-
 def count_parameters(model: nn.Module) -> int:
     size = 0
     for parameter in model.parameters():
@@ -122,7 +113,7 @@ def save_checkpoints(model: nn.Module or nn.DataParallel, path: str):
     torch.save(dict(model_state=model_state), path)
 
 
-def load_checkpoints(model: nn.Module, path: str, device: torch.device):
+def load_checkpoints(model, path, device):
     checkpoint = torch.load(path, map_location=device)
     model_state = checkpoint.get('model_state', None)
     model.load_state_dict(model_state)

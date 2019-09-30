@@ -9,7 +9,6 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from kegnet.classifier import loss as cls_loss
-from kegnet.generator import utils as gen_utils
 from kegnet.classifier import utils as cls_utils
 from kegnet.utils import data, utils
 
@@ -24,18 +23,6 @@ DATASET = None
 BATCH_SIZE = 64
 NUM_BATCHES = 100
 TEMPERATURE = 1
-
-
-def set_model(dataset: str, model: str) -> str:
-    if model is None:
-        if dataset == 'mnist':
-            return 'lenet5'
-        elif dataset in ('fashion', 'svhn'):
-            return 'resnet14'
-        elif data.is_uci(dataset):
-            return 'linear'
-    else:
-        return model
 
 
 def set_parameters_for_teacher(dataset: str):
@@ -211,25 +198,22 @@ def main(dataset: str,
          index: int,
          path_out: str,
          train: bool = False,
-         model: str = None,
          teacher: str = None,
          generators: list = None,
          option: int = None):
     global DEVICE, DATASET
     DATASET = dataset
-    DEVICE = utils.set_device(gpu=index)
+    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     set_parameters(dataset, data_dist)
     index = 0 if index is None else index
     utils.set_seed(seed=2019 + index)
-
-    model = set_model(dataset, model)
 
     path_loss = os.path.join(path_out, get_loss_name(data_dist, option))
     path_model = os.path.join(path_out, 'classifier')
     path_comp = os.path.join(path_out, 'compression-{}.txt'.format(option))
     os.makedirs(path_out, exist_ok=True)
 
-    model_t = cls_utils.init_classifier(DATASET, model).to(DEVICE)
+    model_t = cls_utils.init_classifier(DATASET).to(DEVICE)
     if teacher is not None:
         utils.load_checkpoints(model_t, teacher, DEVICE)
 

@@ -70,10 +70,10 @@ def set_if_none(variable, value):
     return value if variable is None else variable
 
 
-def main(dataset, classifier: str, index: int, path_out: str,
-         model: str = None, alpha: float = None, beta: float = None) -> str:
+def main(dataset, cls_path, index: int, path_out: str,
+         alpha: float = None, beta: float = None) -> str:
     global DEVICE
-    DEVICE = utils.set_device(gpu=index)
+    DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     utils.set_seed(seed=2019 + index)
 
     num_epochs = 200
@@ -85,37 +85,33 @@ def main(dataset, classifier: str, index: int, path_out: str,
     if dataset == 'mnist':
         dec_layers = 1
         lrn_rate = 1e-3
-        model = set_if_none(model, 'lenet5')
         alpha = set_if_none(alpha, 1)
         beta = set_if_none(beta, 0)
     elif dataset == 'fashion':
         dec_layers = 3
         lrn_rate = 1e-2
-        model = set_if_none(model, 'resnet14')
         alpha = set_if_none(alpha, 1)
         beta = set_if_none(beta, 10)
     elif dataset == 'svhn':
         dec_layers = 3
         lrn_rate = 1e-2
-        model = set_if_none(model, 'resnet14')
         alpha = set_if_none(alpha, 1)
         beta = set_if_none(beta, 1)
     else:
         dec_layers = 2
         lrn_rate = 1e-4
-        model = set_if_none(model, 'linear')
         alpha = set_if_none(alpha, 1)
         beta = set_if_none(beta, 0)
 
-    cls_network = cls_utils.init_classifier(dataset, model).to(DEVICE)
+    cls_network = cls_utils.init_classifier(dataset).to(DEVICE)
     gen_network = gen_utils.init_generator(dataset).to(DEVICE)
-    utils.load_checkpoints(cls_network, classifier, DEVICE)
+    utils.load_checkpoints(cls_network, cls_path, DEVICE)
 
-    num_noises = gen_network.num_noises
-    num_features = data.to_dataset(dataset).nx
-    dec_network = models.Decoder(num_features, num_noises, dec_layers).to(DEVICE)
+    nz = gen_network.num_noises
+    nx = data.to_dataset(dataset).nx
+    dec_network = models.Decoder(nx, nz, dec_layers).to(DEVICE)
 
-    networks = gen_network, cls_network, dec_network
+    networks = (gen_network, cls_network, dec_network)
 
     path_loss = os.path.join(path_out, 'loss-gen.txt')
     path_model = os.path.join(path_out, 'generator')

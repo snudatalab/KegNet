@@ -29,16 +29,14 @@ def sample_labels(num_data, num_classes, dist):
 
 
 def init_generator(dataset):
-    ny = data.to_dataset(dataset).ny
-    nx = data.to_dataset(dataset).nx
-    nc = data.to_dataset(dataset).nc
-
+    """
+    Initialize a generator based on the dataset.
+    """
+    d = data.to_dataset(dataset)
     if dataset in ('mnist', 'fashion', 'svhn'):
-        return models.ImageGenerator(ny, nc)
-    elif data.is_uci(dataset):
-        return models.DenseGenerator(ny, nx, n_layers=2)
+        return models.ImageGenerator(d.ny, d.nc)
     else:
-        raise ValueError(dataset)
+        return models.DenseGenerator(d.ny, d.nx, n_layers=2)
 
 
 def generate_data(generator,
