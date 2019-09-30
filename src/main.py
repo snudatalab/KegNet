@@ -6,22 +6,21 @@ from kegnet.generator.train import main as train_generator
 
 def main():
     dataset = 'mnist'
-    index = 0
     classifier = '../pretrained/{}.pth.tar'.format(dataset)
     path_out = '../out/{}'.format(dataset)
+    index = 0
 
     gen_path = '../out/mnist/generator-200.pth.tar'
     if not os.path.exists(gen_path):
-        gen_path = train_generator(dataset, index, classifier, path_out)
+        gen_path = train_generator(dataset, classifier, path_out, index)
 
     data_dist = 'kegnet'
-    student_index = 1
+    option = 1
     generators = [gen_path]
-    train_student(dataset, data_dist, index, path_out,
-                  train=True,
-                  teacher=classifier,
+    train_student(dataset, data_dist, path_out, index,
+                  load=classifier,
                   generators=generators,
-                  option=student_index)
+                  option=option)
 
 
 if __name__ == '__main__':

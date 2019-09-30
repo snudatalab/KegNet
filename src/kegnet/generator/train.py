@@ -57,7 +57,7 @@ def update(networks, losses, optimizer, alpha, beta):
     return accuracy, loss
 
 
-def main(dataset, index, cls_path, out_path):
+def main(dataset, cls_path, out_path, index=0):
     """
     Main function for training a generator.
     """
