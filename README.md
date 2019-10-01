@@ -3,8 +3,8 @@
 This project is a PyTorch implementation of Knowledge Extraction with No Observable Data (NeurIPS 2019).
 This paper proposes a novel approach that extracts the knowledge of a deep neural network without any given data.
 
-![Overview]
-(docs/digits.png)
+![Overview](images/overview.pdf)
+![Overview](/images/overview.pdf)
 
 ## Prerequisites
 
