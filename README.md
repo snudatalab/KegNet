@@ -4,7 +4,7 @@ This project is a PyTorch implementation of Knowledge Extraction with No Observa
 This paper proposes a novel approach that extracts the knowledge of a deep neural network without any given data.
 
 <p align="center">
-    <img src="docs/overview.png" width="600"\>
+    <img src="docs/overview.png" width="560"\>
 </p>
 
 ## Prerequisites
@@ -15,6 +15,20 @@ This paper proposes a novel approach that extracts the knowledge of a deep neura
 - [Scipy](https://scipy.org/)
 - [pandas](https://pandas.pydata.org/)
 - [TensorLy](http://tensorly.org/stable/index.html)
+
+## Usage
+
+You can run the demo script by `bash demo.sh`, which simply runs `src/main.py`.
+It trains five generators based on the pretrained LeNet5 model of `pretrained/mnist.pth.tar` and then uses it to train a student network from its extracted knowledge.
+You can change the dataset, pretrained model, and number of generators by modifying `src/main.py`.
+It is also possible to modify directly our model package such to change the hyperparameters such as learning rates, network structures, sampling distributions, and so on.
+
+The following figure visualizes artificial images for the SVHN dataset, generated from our five generators.
+The digits are clearly recognizable despite the noises, representing that our generators are capable of capturing essential properties of the data distribution given a trained teacher network.
+
+<p align="center">
+    <img src="docs/digits.png" width="540"\>
+</p>
 
 ## Reference
 
