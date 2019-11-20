@@ -35,10 +35,14 @@ The digits are clearly recognizable despite the noises, representing that our ge
 You can download [this bib file](docs/YooCKK19.bib) or copy the following information: 
 
 ```
-@inproceedings{YooCKK19,
-  author    = {Jaemin Yoo and Minyong Cho and Taebum Kim and U Kang},
-  title     = {Knowledge Extraction with No Observable Data},
-  booktitle = {Conference on Neural Information Processing Systems (NeurIPS)},
-  year      = {2019}
+@incollection{NIPS2019_8538,
+title = {Knowledge Extraction with No Observable Data},
+author = {Yoo, Jaemin and Cho, Minyong and Kim, Taebum and Kang, U},
+booktitle = {Advances in Neural Information Processing Systems 32},
+editor = {H. Wallach and H. Larochelle and A. Beygelzimer and F. d\textquotesingle Alch\'{e}-Buc and E. Fox and R. Garnett},
+pages = {2701--2710},
+year = {2019},
+publisher = {Curran Associates, Inc.},
+url = {http://papers.nips.cc/paper/8538-knowledge-extraction-with-no-observable-data.pdf}
 }
 ```
