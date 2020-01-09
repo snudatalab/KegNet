@@ -1,6 +1,6 @@
 # KegNet
 
-This project is a PyTorch implementation of Knowledge Extraction with No Observable Data (NeurIPS 2019).
+This project is a PyTorch implementation of [Knowledge Extraction with No Observable Data](https://papers.nips.cc/paper/8538-knowledge-extraction-with-no-observable-data) (NeurIPS 2019).
 This paper proposes a novel approach that extracts the knowledge of a deep neural network without any given data.
 
 <p align="center">
